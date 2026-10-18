@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Data 
-@AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "role")
+@AllArgsConstructor
+@Table(name = "roles")
 public class Role {
 
     @Id
@@ -24,5 +24,8 @@ public class Role {
 
     @Column(name = "role_name", nullable = false, unique = true, length = 50)
     private String roleName;
-    
+
+    public Role(String roleName) {
+        this.roleName = roleName;
+    }
 }

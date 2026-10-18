@@ -14,18 +14,17 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 
 @Entity
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "users")
 public class User {
 
@@ -36,40 +35,38 @@ public class User {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Enter a valid email")
+    @Column(name = "email", nullable = false, unique = true, length = 150)
     private String email;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "full_name",nullable = false, length = 150)
+    @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
+    @Column(name = "phone", length = 30)
     private String phone;
 
-    private boolean active = true;
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-
-    private OffsetDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now();
-        createdAt = now;
-        updatedAt = now;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = OffsetDateTime.now();
+        createdAt = OffsetDateTime.now();
     }
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-    name = "user_roles",
-    joinColumns = @JoinColumn(name = "user_id"),
-    inverseJoinColumns = @JoinColumn(name = "role_id")
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<Role> roles = new HashSet<>();
 
+    public void addRole(Role role) {
+        this.roles.add(role);
+    }
 }
