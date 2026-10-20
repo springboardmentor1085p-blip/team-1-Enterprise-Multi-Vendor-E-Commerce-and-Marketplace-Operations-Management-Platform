@@ -1,4 +1,4 @@
-package com.karthi.ecommerce.Auth.DTO;
+package com.karthi.ecommerce.DTO;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

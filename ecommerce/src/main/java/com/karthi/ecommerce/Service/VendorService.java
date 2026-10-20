@@ -1,11 +1,11 @@
 package com.karthi.ecommerce.Service;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.karthi.ecommerce.DTO.VendorResponseDto;
 import com.karthi.ecommerce.Model.User;
 import com.karthi.ecommerce.Model.Vendor;
 import com.karthi.ecommerce.Model.VendorApproval;
@@ -31,42 +31,54 @@ public class VendorService {
         this.userRepository = userRepository;
     }
 
-    @Transactional(readOnly = true)
-    public List<Vendor> getAllVendors(VendorStatus status) {
-        if (status != null) {
-            return vendorRepository.findByStatus(status);
-        }
-        return vendorRepository.findAll();
-    }
+    // ─── Internal helper: fetch raw Vendor entity (used within service layer only) ───
 
     @Transactional(readOnly = true)
-    public Vendor getVendorById(Long vendorId) {
+    public Vendor getVendorEntityById(Long vendorId) {
         return vendorRepository.findById(vendorId)
                 .orElseThrow(() -> new IllegalArgumentException("Vendor not found with ID: " + vendorId));
     }
 
     @Transactional(readOnly = true)
-    public Vendor getVendorByEmail(String email) {
+    public Vendor getVendorEntityByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + email));
         return vendorRepository.findByUser(user)
                 .orElseThrow(() -> new IllegalArgumentException("No vendor profile associated with this account"));
     }
 
-    @Transactional
-    public Vendor updateVendorProfile(String email, String businessName) {
-        Vendor vendor = getVendorByEmail(email);
+    // ─── Public API methods — return safe DTOs, never raw entities ───
 
-        if (businessName != null && !businessName.isBlank()) {
-            vendor.setBusinessName(businessName);
-        }
+    @Transactional(readOnly = true)
+    public List<VendorResponseDto> getAllVendors(VendorStatus status) {
+        List<Vendor> vendors = (status != null)
+                ? vendorRepository.findByStatus(status)
+                : vendorRepository.findAll();
+        return vendors.stream().map(this::toDto).toList();
+    }
 
-        return vendorRepository.save(vendor);
+    @Transactional(readOnly = true)
+    public VendorResponseDto getVendorById(Long vendorId) {
+        return toDto(getVendorEntityById(vendorId));
+    }
+
+    @Transactional(readOnly = true)
+    public VendorResponseDto getVendorByEmail(String email) {
+        return toDto(getVendorEntityByEmail(email));
     }
 
     @Transactional
-    public Vendor updateVendorStatus(Long vendorId, VendorStatus status, String adminEmail, String notes) {
-        Vendor vendor = getVendorById(vendorId);
+    public VendorResponseDto updateVendorProfile(String email, String businessName) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        if (businessName != null && !businessName.isBlank()) {
+            vendor.setBusinessName(businessName);
+        }
+        return toDto(vendorRepository.save(vendor));
+    }
+
+    @Transactional
+    public VendorResponseDto updateVendorStatus(Long vendorId, VendorStatus status, String adminEmail, String notes) {
+        Vendor vendor = getVendorEntityById(vendorId);
         vendor.setStatus(status);
         Vendor updatedVendor = vendorRepository.save(vendor);
 
@@ -79,15 +91,31 @@ public class VendorService {
         approval.setReviewedByUser(admin);
         approval.setDecision(status.name());
         approval.setNotes(notes != null ? notes : "Status changed to " + status.name());
-        approval.setReviewedAt(OffsetDateTime.now());
         vendorApprovalRepository.save(approval);
 
-        return updatedVendor;
+        return toDto(updatedVendor);
     }
 
     @Transactional(readOnly = true)
     public List<VendorApproval> getVendorApprovalHistory(Long vendorId) {
-        Vendor vendor = getVendorById(vendorId);
+        Vendor vendor = getVendorEntityById(vendorId);
         return vendorApprovalRepository.findByVendor(vendor);
+    }
+
+    // ─── Mapper: Vendor entity → safe VendorResponseDto ───
+
+    private VendorResponseDto toDto(Vendor vendor) {
+        User user = vendor.getUser();
+        return new VendorResponseDto(
+                vendor.getVendorId(),
+                vendor.getBusinessName(),
+                vendor.getStatus().name(),
+                vendor.getCommissionRate() != null ? vendor.getCommissionRate().toPlainString() : null,
+                user.getUserId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                vendor.getCreatedAt()
+        );
     }
 }

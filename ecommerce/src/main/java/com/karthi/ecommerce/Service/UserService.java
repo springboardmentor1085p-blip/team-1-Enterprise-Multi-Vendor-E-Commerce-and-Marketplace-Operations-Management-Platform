@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.karthi.ecommerce.Auth.DTO.UserResponseDto;
+import com.karthi.ecommerce.DTO.UserResponseDto;
 import com.karthi.ecommerce.Model.CustomerProfile;
 import com.karthi.ecommerce.Model.Role;
 import com.karthi.ecommerce.Model.User;
@@ -44,7 +44,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<UserResponseDto> getAllUsers() {
-        return userRepository.findAll().stream()
+        // BUG 5 FIX: findAllWithRoles() uses JOIN FETCH → loads users + roles in 1 query
+        // findAll() would trigger N+1 queries (1 per user to load their roles)
+        return userRepository.findAllWithRoles().stream()
                 .map(this::mapToDto)
                 .toList();
     }

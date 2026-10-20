@@ -34,7 +34,6 @@ public class CustomerProfile {
 
     public CustomerProfile(User user, LocalDate dateOfBirth) {
         this.user = user;
-        this.userId = user != null ? user.getUserId() : null;
         this.dateOfBirth = dateOfBirth;
     }
 }

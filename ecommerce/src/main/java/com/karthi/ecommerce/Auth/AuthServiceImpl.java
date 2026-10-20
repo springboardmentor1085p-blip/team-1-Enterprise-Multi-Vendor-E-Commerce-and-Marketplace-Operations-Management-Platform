@@ -13,10 +13,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.karthi.ecommerce.Auth.DTO.AuthResponse;
-import com.karthi.ecommerce.Auth.DTO.LoginRequest;
-import com.karthi.ecommerce.Auth.DTO.RegisterRequest;
-import com.karthi.ecommerce.Auth.DTO.UserResponseDto;
+import com.karthi.ecommerce.DTO.AuthResponse;
+import com.karthi.ecommerce.DTO.LoginRequest;
+import com.karthi.ecommerce.DTO.RegisterRequest;
+import com.karthi.ecommerce.DTO.UserResponseDto;
 import com.karthi.ecommerce.Model.CustomerProfile;
 import com.karthi.ecommerce.Model.Role;
 import com.karthi.ecommerce.Model.User;

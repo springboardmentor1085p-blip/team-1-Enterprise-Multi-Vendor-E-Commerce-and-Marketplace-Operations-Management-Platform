@@ -8,10 +8,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.karthi.ecommerce.Auth.DTO.AuthResponse;
-import com.karthi.ecommerce.Auth.DTO.LoginRequest;
-import com.karthi.ecommerce.Auth.DTO.RegisterRequest;
-import com.karthi.ecommerce.Auth.DTO.UserResponseDto;
+import com.karthi.ecommerce.DTO.AuthResponse;
+import com.karthi.ecommerce.DTO.LoginRequest;
+import com.karthi.ecommerce.DTO.RegisterRequest;
+import com.karthi.ecommerce.DTO.UserResponseDto;
 
 import jakarta.validation.Valid;
 

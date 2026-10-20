@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.karthi.ecommerce.Model.Vendor;
+import com.karthi.ecommerce.DTO.VendorResponseDto;
 import com.karthi.ecommerce.Model.VendorApproval;
 import com.karthi.ecommerce.Model.VendorStatus;
 import com.karthi.ecommerce.Service.VendorService;
@@ -30,29 +30,31 @@ public class VendorController {
         this.vendorService = vendorService;
     }
 
-    // Public endpoint: Get approved vendors
+    // Public endpoint: Get approved vendors (no auth needed)
     @GetMapping("/vendors")
-    public ResponseEntity<List<Vendor>> getApprovedVendors() {
+    public ResponseEntity<List<VendorResponseDto>> getApprovedVendors() {
         return ResponseEntity.ok(vendorService.getAllVendors(VendorStatus.APPROVED));
     }
 
-    // Public endpoint: Get vendor by ID
+    // Public endpoint: Get vendor by ID (no auth needed)
     @GetMapping("/vendors/{vendorId}")
-    public ResponseEntity<Vendor> getVendorById(@PathVariable Long vendorId) {
+    public ResponseEntity<VendorResponseDto> getVendorById(@PathVariable Long vendorId) {
         return ResponseEntity.ok(vendorService.getVendorById(vendorId));
     }
 
-    // Vendor self-service: View vendor store profile
+    // Vendor self-service: View own store profile
+    // SecurityConfig: /api/vendor/** → ROLE_VENDOR or ROLE_ADMIN
+    // @PreAuthorize: Extra method-level guard (defence in depth)
     @GetMapping("/vendor/profile")
     @PreAuthorize("hasAuthority('ROLE_VENDOR')")
-    public ResponseEntity<Vendor> getMyVendorProfile(Authentication authentication) {
+    public ResponseEntity<VendorResponseDto> getMyVendorProfile(Authentication authentication) {
         return ResponseEntity.ok(vendorService.getVendorByEmail(authentication.getName()));
     }
 
-    // Vendor self-service: Update vendor store profile
+    // Vendor self-service: Update own store profile
     @PutMapping("/vendor/profile")
     @PreAuthorize("hasAuthority('ROLE_VENDOR')")
-    public ResponseEntity<Vendor> updateMyVendorProfile(
+    public ResponseEntity<VendorResponseDto> updateMyVendorProfile(
             Authentication authentication,
             @RequestBody Map<String, String> body
     ) {
@@ -60,19 +62,21 @@ public class VendorController {
         return ResponseEntity.ok(vendorService.updateVendorProfile(authentication.getName(), businessName));
     }
 
-    // Admin endpoint: List all vendors with optional status filter
+    // Admin: List all vendors with optional status filter
+    // SecurityConfig: /api/admin/** → ROLE_ADMIN only
+    // @PreAuthorize: Extra method-level guard (defence in depth)
     @GetMapping("/admin/vendors")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<List<Vendor>> getAllVendorsAdmin(
+    public ResponseEntity<List<VendorResponseDto>> getAllVendorsAdmin(
             @RequestParam(required = false) VendorStatus status
     ) {
         return ResponseEntity.ok(vendorService.getAllVendors(status));
     }
 
-    // Admin endpoint: Approve / Reject / Suspend vendor and record in vendor_approvals
+    // Admin: Approve / Reject / Suspend vendor and record in vendor_approvals
     @PatchMapping("/admin/vendors/{vendorId}/status")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<Vendor> updateVendorStatus(
+    public ResponseEntity<VendorResponseDto> updateVendorStatus(
             Authentication authentication,
             @PathVariable Long vendorId,
             @RequestBody Map<String, String> body
@@ -83,7 +87,7 @@ public class VendorController {
         return ResponseEntity.ok(vendorService.updateVendorStatus(vendorId, status, authentication.getName(), notes));
     }
 
-    // Admin endpoint: View approval history for a vendor
+    // Admin: View full approval history for a vendor
     @GetMapping("/admin/vendors/{vendorId}/approvals")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<VendorApproval>> getVendorApprovalHistory(@PathVariable Long vendorId) {
