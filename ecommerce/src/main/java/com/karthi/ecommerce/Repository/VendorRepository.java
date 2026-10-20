@@ -6,9 +6,9 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import com.karthi.Enum.VendorStatus;
 import com.karthi.ecommerce.Model.User;
 import com.karthi.ecommerce.Model.Vendor;
-import com.karthi.ecommerce.Model.VendorStatus;
 
 @Repository
 public interface VendorRepository extends JpaRepository<Vendor, Long> {

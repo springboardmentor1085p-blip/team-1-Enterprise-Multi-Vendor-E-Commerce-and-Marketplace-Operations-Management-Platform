@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.karthi.Enum.VendorStatus;
 import com.karthi.ecommerce.DTO.VendorResponseDto;
 import com.karthi.ecommerce.Model.VendorApproval;
-import com.karthi.ecommerce.Model.VendorStatus;
 import com.karthi.ecommerce.Service.VendorService;
 
 @RestController

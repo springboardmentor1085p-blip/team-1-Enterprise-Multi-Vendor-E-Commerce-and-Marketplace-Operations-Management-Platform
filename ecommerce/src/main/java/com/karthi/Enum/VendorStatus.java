@@ -1,4 +1,4 @@
-package com.karthi.ecommerce.Model;
+package com.karthi.Enum;
 
 public enum VendorStatus {
     PENDING,

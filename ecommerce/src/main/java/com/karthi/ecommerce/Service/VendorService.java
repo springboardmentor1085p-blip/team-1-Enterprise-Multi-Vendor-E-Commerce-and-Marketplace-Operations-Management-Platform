@@ -5,11 +5,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.karthi.Enum.VendorStatus;
 import com.karthi.ecommerce.DTO.VendorResponseDto;
 import com.karthi.ecommerce.Model.User;
 import com.karthi.ecommerce.Model.Vendor;
 import com.karthi.ecommerce.Model.VendorApproval;
-import com.karthi.ecommerce.Model.VendorStatus;
 import com.karthi.ecommerce.Repository.UserRepository;
 import com.karthi.ecommerce.Repository.VendorApprovalRepository;
 import com.karthi.ecommerce.Repository.VendorRepository;

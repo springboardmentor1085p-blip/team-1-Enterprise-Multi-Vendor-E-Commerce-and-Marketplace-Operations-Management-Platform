@@ -3,6 +3,8 @@ package com.karthi.ecommerce.Model;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+import com.karthi.Enum.VendorStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

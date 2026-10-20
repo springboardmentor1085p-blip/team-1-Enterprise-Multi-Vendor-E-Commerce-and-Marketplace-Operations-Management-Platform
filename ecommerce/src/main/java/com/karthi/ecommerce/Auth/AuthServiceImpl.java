@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.karthi.Enum.VendorStatus;
 import com.karthi.ecommerce.DTO.AuthResponse;
 import com.karthi.ecommerce.DTO.LoginRequest;
 import com.karthi.ecommerce.DTO.RegisterRequest;
@@ -21,7 +22,6 @@ import com.karthi.ecommerce.Model.CustomerProfile;
 import com.karthi.ecommerce.Model.Role;
 import com.karthi.ecommerce.Model.User;
 import com.karthi.ecommerce.Model.Vendor;
-import com.karthi.ecommerce.Model.VendorStatus;
 import com.karthi.ecommerce.Repository.CustomerProfileRepository;
 import com.karthi.ecommerce.Repository.RoleRepository;
 import com.karthi.ecommerce.Repository.UserRepository;

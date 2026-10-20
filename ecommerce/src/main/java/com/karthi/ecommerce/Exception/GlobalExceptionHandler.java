@@ -18,7 +18,7 @@ import org.springframework.web.context.request.WebRequest;
  * Global exception handler — converts exceptions into structured JSON error responses.
  * Without this, Spring returns a generic 500 page for any unhandled exception.
  */
-@RestControllerAdvice("authGlobalExceptionHandler")
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
     // ─── 400 Bad Request ─────────────────────────────────────────────────────────
