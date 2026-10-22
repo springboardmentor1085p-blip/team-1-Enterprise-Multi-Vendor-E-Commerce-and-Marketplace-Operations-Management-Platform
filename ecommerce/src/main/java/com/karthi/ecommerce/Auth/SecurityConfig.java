@@ -43,6 +43,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/vendors/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/orders/track/**", "/api/payments/verify/**").permitAll()
                 .requestMatchers("/api/vendor/**").hasAnyAuthority("ROLE_VENDOR", "ROLE_ADMIN")
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                 .anyRequest().authenticated()
