@@ -13,9 +13,9 @@ public class CategoryRequestDto {
     @NotBlank(message = "Category name is required")
     private String name;
 
-    // Optional: slug for URL (e.g., "electronics"). Auto-generated if omitted.
+    // Optional: auto-generated from name if not provided
     private String slug;
 
-    // Optional: ID of parent category if this is a subcategory (e.g. Laptops under Electronics)
+    // Optional: set to make this a subcategory
     private Long parentCategoryId;
 }
