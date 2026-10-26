@@ -64,7 +64,7 @@ public class CartService {
             throw new IllegalArgumentException("This product variant is currently inactive");
         }
 
-        Integer availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(variant.getVariantId());
+        Long availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(variant.getVariantId());
         if (availableStock == null || availableStock < request.getQuantity()) {
             throw new IllegalArgumentException("Requested quantity exceeds available stock (" + (availableStock == null ? 0 : availableStock) + ")");
         }
@@ -106,7 +106,7 @@ public class CartService {
         if (request.getQuantity() <= 0) {
             cartItemRepository.delete(item);
         } else {
-            Integer availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(item.getVariant().getVariantId());
+            Long availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(item.getVariant().getVariantId());
             if (availableStock != null && request.getQuantity() > availableStock) {
                 throw new IllegalArgumentException("Quantity exceeds available stock (" + availableStock + ")");
             }

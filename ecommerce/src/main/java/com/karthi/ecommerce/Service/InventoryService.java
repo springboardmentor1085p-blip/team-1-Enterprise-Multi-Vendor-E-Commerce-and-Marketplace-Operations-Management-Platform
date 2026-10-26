@@ -106,7 +106,8 @@ public class InventoryService {
 
     @Transactional
     public void reserveStock(Long variantId, int quantity, Long orderId, User user) {
-        List<Inventory> inventories = inventoryRepository.findByVariant_VariantId(variantId);
+        // Use pessimistic lock to prevent overselling and concurrency races
+        List<Inventory> inventories = inventoryRepository.findByVariant_VariantIdWithLock(variantId);
         int remainingToReserve = quantity;
 
         for (Inventory inv : inventories) {
@@ -138,7 +139,8 @@ public class InventoryService {
 
     @Transactional
     public void releaseStock(Long variantId, int quantity, Long orderId, User user) {
-        List<Inventory> inventories = inventoryRepository.findByVariant_VariantId(variantId);
+        // Use pessimistic lock to prevent concurrent release errors
+        List<Inventory> inventories = inventoryRepository.findByVariant_VariantIdWithLock(variantId);
         int remainingToRelease = quantity;
 
         for (Inventory inv : inventories) {
@@ -168,7 +170,7 @@ public class InventoryService {
     }
 
     public Integer getAvailableStock(Long variantId) {
-        Integer stock = inventoryRepository.getTotalAvailableQuantityForVariant(variantId);
-        return stock != null ? stock : 0;
+        Long stock = inventoryRepository.getTotalAvailableQuantityForVariant(variantId);
+        return stock != null ? stock.intValue() : 0;
     }
 }

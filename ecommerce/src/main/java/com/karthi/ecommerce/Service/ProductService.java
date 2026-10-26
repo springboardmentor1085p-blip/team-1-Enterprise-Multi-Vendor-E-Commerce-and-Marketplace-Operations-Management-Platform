@@ -189,7 +189,7 @@ public class ProductService {
         List<ProductImage> images = imageRepository.findByProduct_ProductIdOrderBySortOrderAsc(p.getProductId());
 
         List<ProductResponseDto.VariantResponseDto> variantDtos = variants.stream().map(v -> {
-            Integer availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(v.getVariantId());
+            Long availableStock = inventoryRepository.getTotalAvailableQuantityForVariant(v.getVariantId());
             return ProductResponseDto.VariantResponseDto.builder()
                     .variantId(v.getVariantId())
                     .sku(v.getSku())
@@ -197,7 +197,7 @@ public class ProductService {
                     .attributesJson(v.getAttributesJson())
                     .price(v.getPrice())
                     .isActive(v.isActive())
-                    .availableStock(availableStock != null ? availableStock : 0)
+                    .availableStock(availableStock != null ? availableStock.intValue() : 0)
                     .build();
         }).collect(Collectors.toList());
 

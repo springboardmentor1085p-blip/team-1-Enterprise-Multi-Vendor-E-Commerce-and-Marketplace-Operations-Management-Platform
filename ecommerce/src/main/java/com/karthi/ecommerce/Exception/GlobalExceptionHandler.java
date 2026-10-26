@@ -21,7 +21,25 @@ import org.springframework.web.context.request.WebRequest;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<Map<String, Object>> handleInsufficientStock(
+            InsufficientStockException ex,
+            WebRequest request) {
+
+        return buildError(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request
+        );
+    }
+
     // ─── 400 Bad Request ─────────────────────────────────────────────────────────
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(
+            IllegalStateException ex, WebRequest request) {
+        return buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
 
     /**
      * Handles illegal arguments like "Email already registered", "Vendor not found".

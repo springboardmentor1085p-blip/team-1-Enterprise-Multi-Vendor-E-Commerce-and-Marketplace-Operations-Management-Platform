@@ -24,6 +24,9 @@ public class PaymentResponseDto {
     private BigDecimal amount;
     private String currency;
     private PaymentStatus status;
+    private String failureReason;
+    private String sandboxOutcome;
+    private String idempotencyKey;
     private OffsetDateTime paidAt;
     private OffsetDateTime createdAt;
 }

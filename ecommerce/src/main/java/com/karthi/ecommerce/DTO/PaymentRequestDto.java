@@ -21,4 +21,10 @@ public class PaymentRequestDto {
     private BigDecimal amount;
 
     private String currency = "INR";
+
+    // Sandbox simulation outcomes: "SUCCESS" (default), "DECLINED", "TIMEOUT", "INSUFFICIENT_FUNDS"
+    private String sandboxOutcome = "SUCCESS";
+
+    // Unique client idempotency key to prevent double charging
+    private String idempotencyKey;
 }

@@ -5,12 +5,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.karthi.Enum.OrderStatus;
 import com.karthi.Enum.PaymentStatus;
-import com.karthi.ecommerce.DTO.OrderStatusUpdateDto;
 import com.karthi.ecommerce.DTO.PaymentRequestDto;
 import com.karthi.ecommerce.DTO.PaymentResponseDto;
 import com.karthi.ecommerce.Model.Order;
@@ -27,7 +27,7 @@ public class PaymentService {
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
-                          OrderService orderService) {
+                          @Lazy OrderService orderService) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.orderService = orderService;
@@ -35,6 +35,15 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponseDto processPayment(Long userId, PaymentRequestDto dto) {
+        // 1. Idempotency Check
+        if (dto.getIdempotencyKey() != null && !dto.getIdempotencyKey().isBlank()) {
+            var existingWithKey = paymentRepository.findByIdempotencyKey(dto.getIdempotencyKey());
+            if (existingWithKey.isPresent()) {
+                return mapToDto(existingWithKey.get());
+            }
+        }
+
+        // 2. Load and validate Order
         Order order = orderRepository.findById(dto.getOrderId())
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + dto.getOrderId()));
 
@@ -42,7 +51,17 @@ public class PaymentService {
             throw new IllegalArgumentException("Order does not belong to user");
         }
 
-        // Check if there is already a payment or create new
+        // 3. Prevent duplicate payment if already paid
+        var completedPayment = paymentRepository.findFirstByOrder_OrderIdAndStatus(order.getOrderId(), PaymentStatus.COMPLETED);
+        if (completedPayment.isPresent() || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.PROCESSING) {
+            throw new IllegalStateException("Order " + order.getOrderNumber() + " has already been paid successfully. Duplicate payment rejected.");
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot pay for cancelled order: " + order.getOrderNumber());
+        }
+
+        // 4. Create or reuse pending payment record
         List<Payment> existingPayments = paymentRepository.findByOrder_OrderId(order.getOrderId());
         Payment payment = existingPayments.stream()
                 .filter(p -> p.getStatus() == PaymentStatus.PENDING)
@@ -58,18 +77,43 @@ public class PaymentService {
                 dto.getProviderReference() : "PAY-" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
         payment.setAmount(dto.getAmount());
         payment.setCurrency(dto.getCurrency() != null ? dto.getCurrency() : "INR");
-        payment.setStatus(PaymentStatus.COMPLETED);
-        payment.setPaidAt(OffsetDateTime.now());
+        payment.setIdempotencyKey(dto.getIdempotencyKey());
 
-        Payment saved = paymentRepository.save(payment);
+        // 5. Sandbox outcome simulation
+        String outcome = dto.getSandboxOutcome() != null ? dto.getSandboxOutcome().toUpperCase().trim() : "SUCCESS";
+        payment.setSandboxOutcome(outcome);
 
-        // Update order status to CONFIRMED
-        OrderStatusUpdateDto statusDto = new OrderStatusUpdateDto();
-        statusDto.setStatus(OrderStatus.CONFIRMED);
-        statusDto.setComments("Payment received via " + dto.getProvider() + " (Ref: " + saved.getProviderReference() + ")");
-        orderService.updateOrderStatus(order.getOrderId(), userId, statusDto);
+        switch (outcome) {
+            case "SUCCESS":
+                payment.setStatus(PaymentStatus.COMPLETED);
+                payment.setFailureReason(null);
+                payment.setPaidAt(OffsetDateTime.now());
+                Payment savedSuccess = paymentRepository.save(payment);
+                // Confirm the order
+                orderService.confirmPaidOrder(order.getOrderId(), savedSuccess);
+                return mapToDto(savedSuccess);
 
-        return mapToDto(saved);
+            case "DECLINED":
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason("Transaction declined: Card declined by issuing bank");
+                payment.setPaidAt(null);
+                return mapToDto(paymentRepository.save(payment));
+
+            case "INSUFFICIENT_FUNDS":
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason("Transaction declined: Insufficient funds in account");
+                payment.setPaidAt(null);
+                return mapToDto(paymentRepository.save(payment));
+
+            case "TIMEOUT":
+                payment.setStatus(PaymentStatus.PENDING);
+                payment.setFailureReason("Transaction pending: Gateway timed out. Awaiting reconciliation.");
+                payment.setPaidAt(null);
+                return mapToDto(paymentRepository.save(payment));
+
+            default:
+                throw new IllegalArgumentException("Unsupported sandbox outcome: " + outcome + ". Supported: SUCCESS, DECLINED, TIMEOUT, INSUFFICIENT_FUNDS");
+        }
     }
 
     public List<PaymentResponseDto> getOrderPayments(Long orderId, Long userId) {
@@ -79,7 +123,7 @@ public class PaymentService {
             throw new IllegalArgumentException("Order does not belong to user");
         }
 
-        return paymentRepository.findByOrder_OrderId(orderId).stream()
+        return paymentRepository.findByOrder_OrderIdOrderByCreatedAtDesc(orderId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -90,7 +134,7 @@ public class PaymentService {
         return mapToDto(payment);
     }
 
-    private PaymentResponseDto mapToDto(Payment p) {
+    public PaymentResponseDto mapToDto(Payment p) {
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .orderId(p.getOrder().getOrderId())
@@ -100,6 +144,9 @@ public class PaymentService {
                 .amount(p.getAmount())
                 .currency(p.getCurrency())
                 .status(p.getStatus())
+                .failureReason(p.getFailureReason())
+                .sandboxOutcome(p.getSandboxOutcome())
+                .idempotencyKey(p.getIdempotencyKey())
                 .paidAt(p.getPaidAt())
                 .createdAt(p.getCreatedAt())
                 .build();

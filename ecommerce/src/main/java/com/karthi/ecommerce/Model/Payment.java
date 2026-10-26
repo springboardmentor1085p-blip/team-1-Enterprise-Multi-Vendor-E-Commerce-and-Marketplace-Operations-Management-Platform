@@ -52,6 +52,15 @@ public class Payment {
     @Column(name = "status", nullable = false, length = 30)
     private PaymentStatus status = PaymentStatus.PENDING;
 
+    @Column(name = "failure_reason", length = 255)
+    private String failureReason;
+
+    @Column(name = "sandbox_outcome", length = 50)
+    private String sandboxOutcome;
+
+    @Column(name = "idempotency_key", length = 100, unique = true)
+    private String idempotencyKey;
+
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 

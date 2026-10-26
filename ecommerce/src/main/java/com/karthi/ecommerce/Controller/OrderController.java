@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.karthi.ecommerce.DTO.CheckoutRequestDto;
+import com.karthi.ecommerce.DTO.OrderCancelRequestDto;
 import com.karthi.ecommerce.DTO.OrderResponseDto;
 import com.karthi.ecommerce.DTO.OrderStatusUpdateDto;
 import com.karthi.ecommerce.Model.User;
@@ -69,6 +70,19 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderByOrderNumber(orderNumber));
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<OrderResponseDto> cancelOrder(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @Valid @RequestBody OrderCancelRequestDto request) {
+        User user = userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(orderService.cancelOrder(id, user.getUserId(), isAdmin, request.getReason()));
+    }
+
     @PreAuthorize("hasAnyRole('ADMIN', 'VENDOR', 'WAREHOUSE_STAFF')")
     @PutMapping("/{id}/status")
     public ResponseEntity<OrderResponseDto> updateStatus(
@@ -78,5 +92,12 @@ public class OrderController {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         return ResponseEntity.ok(orderService.updateOrderStatus(id, user.getUserId(), request));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/expire-unpaid")
+    public ResponseEntity<String> triggerExpiration() {
+        orderService.expireUnpaidOrders();
+        return ResponseEntity.ok("Unpaid order expiration process triggered successfully");
     }
 }
