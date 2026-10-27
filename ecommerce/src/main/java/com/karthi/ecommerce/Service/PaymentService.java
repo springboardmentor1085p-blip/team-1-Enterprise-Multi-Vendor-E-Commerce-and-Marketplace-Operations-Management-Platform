@@ -18,6 +18,10 @@ import com.karthi.ecommerce.Model.Payment;
 import com.karthi.ecommerce.Repository.OrderRepository;
 import com.karthi.ecommerce.Repository.PaymentRepository;
 
+
+import com.karthi.ecommerce.Model.Notification;
+
+
 @Service
 public class PaymentService {
 
@@ -25,13 +29,21 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final OrderService orderService;
 
-    public PaymentService(PaymentRepository paymentRepository,
-                          OrderRepository orderRepository,
-                          OrderService orderService) {
-        this.paymentRepository = paymentRepository;
-        this.orderRepository = orderRepository;
-        this.orderService = orderService;
-    }
+private final NotificationService notificationService;
+
+
+
+
+public PaymentService(PaymentRepository paymentRepository,
+                      OrderRepository orderRepository,
+                      OrderService orderService,
+                      NotificationService notificationService) {
+    this.paymentRepository = paymentRepository;
+    this.orderRepository = orderRepository;
+    this.orderService = orderService;
+    this.notificationService = notificationService;
+}
+
 
     @Transactional
     public PaymentResponseDto processPayment(Long userId, PaymentRequestDto dto) {
@@ -68,6 +80,18 @@ public class PaymentService {
         statusDto.setStatus(OrderStatus.CONFIRMED);
         statusDto.setComments("Payment received via " + dto.getProvider() + " (Ref: " + saved.getProviderReference() + ")");
         orderService.updateOrderStatus(order.getOrderId(), userId, statusDto);
+
+
+
+
+notificationService.createNotification(
+        order.getUser().getUserId(),
+        "Payment successful",
+        "Payment for order " + order.getOrderNumber()
+                + " was completed successfully. Reference: "
+                + saved.getProviderReference(),
+        Notification.NotificationType.PAYMENT
+);
 
         return mapToDto(saved);
     }

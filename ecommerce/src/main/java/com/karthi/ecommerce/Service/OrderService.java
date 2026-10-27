@@ -33,6 +33,8 @@ import com.karthi.ecommerce.Repository.OrderStatusHistoryRepository;
 import com.karthi.ecommerce.Repository.PaymentRepository;
 import com.karthi.ecommerce.Repository.UserRepository;
 
+
+import com.karthi.ecommerce.Model.Notification;
 @Service
 public class OrderService {
 
@@ -46,6 +48,7 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final InventoryService inventoryService;
 
+private final NotificationService notificationService;
     public OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
                         OrderStatusHistoryRepository statusHistoryRepository,
@@ -54,7 +57,8 @@ public class OrderService {
                         AddressRepository addressRepository,
                         UserRepository userRepository,
                         PaymentRepository paymentRepository,
-                        InventoryService inventoryService) {
+                        InventoryService inventoryService,
+                        NotificationService notificationService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.statusHistoryRepository = statusHistoryRepository;
@@ -64,6 +68,7 @@ public class OrderService {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.inventoryService = inventoryService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -158,6 +163,14 @@ public class OrderService {
         payment.setStatus(PaymentStatus.PENDING);
         paymentRepository.save(payment);
 
+
+        notificationService.createNotification(
+        user.getUserId(),
+        "Order placed successfully",
+        "Your order " + savedOrder.getOrderNumber()
+                + " has been placed. Payment status: PENDING.",
+        Notification.NotificationType.ORDER
+);
         // Clear cart
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
 
