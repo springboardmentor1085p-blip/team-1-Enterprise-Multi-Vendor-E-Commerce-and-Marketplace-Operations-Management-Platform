@@ -35,6 +35,8 @@ import com.karthi.ecommerce.Repository.UserRepository;
 
 
 import com.karthi.ecommerce.Model.Notification;
+import java.util.HashSet;
+import java.util.Set;
 @Service
 public class OrderService {
 
@@ -171,6 +173,22 @@ private final NotificationService notificationService;
                 + " has been placed. Payment status: PENDING.",
         Notification.NotificationType.ORDER
 );
+Set<Long> notifiedVendorIds = new HashSet<>();
+
+for (OrderItem orderItem : orderItems) {
+    User vendorUser = orderItem.getVendor().getUser();
+    Long vendorUserId = vendorUser.getUserId();
+
+    if (notifiedVendorIds.add(vendorUserId)) {
+        notificationService.createNotification(
+                vendorUserId,
+                "New order received",
+                "Order " + savedOrder.getOrderNumber()
+                        + " contains products from your store.",
+                Notification.NotificationType.VENDOR
+        );
+    }
+}
         // Clear cart
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
 
@@ -230,6 +248,51 @@ private final NotificationService notificationService;
         history.setNewStatus(newStatus);
         history.setComments(dto.getComments());
         statusHistoryRepository.save(history);
+
+String notificationTitle;
+String notificationMessage;
+Notification.NotificationType notificationType = Notification.NotificationType.ORDER;
+
+switch (newStatus.name()) {
+    case "CONFIRMED":
+        notificationTitle = "Order confirmed";
+        notificationMessage = "Your order " + updatedOrder.getOrderNumber()
+                + " has been confirmed.";
+        break;
+
+    case "SHIPPED":
+        notificationTitle = "Order shipped";
+        notificationMessage = "Your order " + updatedOrder.getOrderNumber()
+                + " has been shipped.";
+        notificationType = Notification.NotificationType.SHIPMENT;
+        break;
+
+    case "DELIVERED":
+        notificationTitle = "Order delivered";
+        notificationMessage = "Your order " + updatedOrder.getOrderNumber()
+                + " has been delivered.";
+        notificationType = Notification.NotificationType.SHIPMENT;
+        break;
+
+    case "CANCELLED":
+        notificationTitle = "Order cancelled";
+        notificationMessage = "Your order " + updatedOrder.getOrderNumber()
+                + " has been cancelled.";
+        break;
+
+    default:
+        notificationTitle = "Order status updated";
+        notificationMessage = "Your order " + updatedOrder.getOrderNumber()
+                + " status changed to " + newStatus.name() + ".";
+        break;
+}
+
+notificationService.createNotification(
+        updatedOrder.getUser().getUserId(),
+        notificationTitle,
+        notificationMessage,
+        notificationType
+);
 
         return mapToDto(updatedOrder);
     }
