@@ -15,14 +15,15 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserService userService;
-
+private final EmailService emailService;
     public NotificationService(
-            NotificationRepository notificationRepository,
-            UserService userService) {
-        this.notificationRepository = notificationRepository;
-        this.userService = userService;
-    }
-
+        NotificationRepository notificationRepository,
+        UserService userService,
+        EmailService emailService) {
+    this.notificationRepository = notificationRepository;
+    this.userService = userService;
+    this.emailService = emailService;
+}
     @Transactional(readOnly = true)
     public List<Notification> getMyNotifications(String email) {
         User user = userService.getUserByEmail(email);
@@ -77,21 +78,42 @@ public class NotificationService {
     }
 
     @Transactional
-    public Notification createNotification(
-            Long userId,
-            String title,
-            String message,
-            Notification.NotificationType type) {
+    
+@Transactional
+public Notification createNotification(
+        Long userId,
+        String title,
+        String message,
+        Notification.NotificationType type) {
 
-        User user = userService.getUserById(userId);
+    User user = userService.getUserById(userId);
 
-        Notification notification = new Notification();
-        notification.setUser(user);
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setType(type);
-        notification.setRead(false);
+    Notification notification = new Notification();
+    notification.setUser(user);
+    notification.setTitle(title);
+    notification.setMessage(message);
+    notification.setType(type);
+    notification.setRead(false);
 
-        return notificationRepository.save(notification);
+    Notification savedNotification =
+            notificationRepository.save(notification);
+
+    // Send email to the user's registered email address.
+    try {
+        emailService.sendEmail(
+                user.getEmail(),
+                title,
+                message
+        );
+    } catch (Exception e) {
+        // Keep the in-app notification even if email sending fails.
+        System.err.println(
+                "Email notification failed for user ID "
+                        + userId + ": " + e.getMessage()
+        );
     }
+
+    return savedNotification;
+}
+
 }
