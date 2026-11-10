@@ -1,15 +1,35 @@
 package com.shopstack.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.shopstack.Enum.VendorStatus;
+import com.shopstack.DTO.VendorAnalyticsOverviewDto;
+import com.shopstack.DTO.VendorCommissionResponseDto;
+import com.shopstack.DTO.VendorLowStockAlertDto;
 import com.shopstack.DTO.VendorResponseDto;
+import com.shopstack.DTO.VendorSaleItemDto;
+import com.shopstack.DTO.VendorTopProductDto;
+import com.shopstack.Enum.ProductStatus;
+import com.shopstack.Enum.VendorStatus;
+import com.shopstack.Model.Inventory;
+import com.shopstack.Model.OrderItem;
 import com.shopstack.Model.User;
 import com.shopstack.Model.Vendor;
 import com.shopstack.Model.VendorApproval;
+import com.shopstack.Repository.InventoryRepository;
+import com.shopstack.Repository.OrderItemRepository;
+import com.shopstack.Repository.ProductRepository;
 import com.shopstack.Repository.UserRepository;
 import com.shopstack.Repository.VendorApprovalRepository;
 import com.shopstack.Repository.VendorRepository;
@@ -20,15 +40,24 @@ public class VendorService {
     private final VendorRepository vendorRepository;
     private final VendorApprovalRepository vendorApprovalRepository;
     private final UserRepository userRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
 
     public VendorService(
             VendorRepository vendorRepository,
             VendorApprovalRepository vendorApprovalRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            OrderItemRepository orderItemRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository
     ) {
         this.vendorRepository = vendorRepository;
         this.vendorApprovalRepository = vendorApprovalRepository;
         this.userRepository = userRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.productRepository = productRepository;
+        this.inventoryRepository = inventoryRepository;
     }
 
     // ─── Internal helper: fetch raw Vendor entity (used within service layer only) ───
@@ -44,7 +73,7 @@ public class VendorService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + email));
         return vendorRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalArgumentException("No vendor profile associated with this account"));
+                .orElseThrow(() -> new IllegalArgumentException("No vendor profile associated with account: " + email));
     }
 
     // ─── Public API methods — return safe DTOs, never raw entities ───
@@ -100,6 +129,218 @@ public class VendorService {
     public List<VendorApproval> getVendorApprovalHistory(Long vendorId) {
         Vendor vendor = getVendorEntityById(vendorId);
         return vendorApprovalRepository.findByVendor(vendor);
+    }
+
+    // ─── Milestone 3: Commission Calculation & Statement ─────────────────────────
+
+    @Transactional
+    public VendorResponseDto updateCommissionRate(Long vendorId, BigDecimal commissionRate) {
+        Vendor vendor = getVendorEntityById(vendorId);
+        vendor.setCommissionRate(commissionRate);
+        return toDto(vendorRepository.save(vendor));
+    }
+
+    @Transactional(readOnly = true)
+    public VendorCommissionResponseDto getVendorCommissionStatement(Long vendorId) {
+        Vendor vendor = getVendorEntityById(vendorId);
+        return buildCommissionStatement(vendor);
+    }
+
+    @Transactional(readOnly = true)
+    public VendorCommissionResponseDto getVendorCommissionStatementByEmail(String email) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        return buildCommissionStatement(vendor);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendorCommissionResponseDto> getAllVendorsCommissionSummary() {
+        return vendorRepository.findAll().stream()
+                .map(this::buildCommissionStatement)
+                .collect(Collectors.toList());
+    }
+
+    private VendorCommissionResponseDto buildCommissionStatement(Vendor vendor) {
+        List<OrderItem> orderItems = orderItemRepository.findByVendor_VendorIdOrderByOrder_PlacedAtDesc(vendor.getVendorId());
+
+        BigDecimal commissionRate = vendor.getCommissionRate() != null
+                ? vendor.getCommissionRate()
+                : new BigDecimal("10.00");
+
+        BigDecimal grossSales = BigDecimal.ZERO;
+        Set<Long> uniqueOrders = new HashSet<>();
+        List<VendorSaleItemDto> sales = new ArrayList<>();
+
+        for (OrderItem oi : orderItems) {
+            grossSales = grossSales.add(oi.getLineTotal());
+            if (oi.getOrder() != null) {
+                uniqueOrders.add(oi.getOrder().getOrderId());
+            }
+
+            BigDecimal itemCommission = oi.getLineTotal()
+                    .multiply(commissionRate)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            BigDecimal itemPayout = oi.getLineTotal().subtract(itemCommission);
+
+            sales.add(VendorSaleItemDto.builder()
+                    .orderItemId(oi.getOrderItemId())
+                    .orderId(oi.getOrder() != null ? oi.getOrder().getOrderId() : null)
+                    .orderNumber(oi.getOrder() != null ? oi.getOrder().getOrderNumber() : "N/A")
+                    .orderStatus(oi.getOrder() != null && oi.getOrder().getStatus() != null ? oi.getOrder().getStatus().name() : "PENDING")
+                    .productName(oi.getProductNameSnapshot())
+                    .sku(oi.getSkuSnapshot())
+                    .quantity(oi.getQuantity())
+                    .unitPrice(oi.getUnitPrice())
+                    .lineTotal(oi.getLineTotal())
+                    .commissionRate(commissionRate)
+                    .commissionAmount(itemCommission)
+                    .vendorPayout(itemPayout)
+                    .placedAt(oi.getOrder() != null ? oi.getOrder().getPlacedAt() : null)
+                    .build());
+        }
+
+        BigDecimal platformCommission = grossSales.multiply(commissionRate)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal netEarnings = grossSales.subtract(platformCommission);
+
+        return VendorCommissionResponseDto.builder()
+                .vendorId(vendor.getVendorId())
+                .businessName(vendor.getBusinessName())
+                .commissionRate(commissionRate)
+                .totalOrdersCount(uniqueOrders.size())
+                .grossSales(grossSales)
+                .platformCommission(platformCommission)
+                .netEarnings(netEarnings)
+                .recentSales(sales)
+                .build();
+    }
+
+    // ─── Milestone 3: Vendor Analytics & Dashboard Overview ──────────────────────
+
+    @Transactional(readOnly = true)
+    public VendorAnalyticsOverviewDto getVendorAnalyticsOverview(String email) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        List<OrderItem> items = orderItemRepository.findByVendor_VendorIdOrderByOrder_PlacedAtDesc(vendor.getVendorId());
+
+        BigDecimal commissionRate = vendor.getCommissionRate() != null
+                ? vendor.getCommissionRate()
+                : new BigDecimal("10.00");
+
+        BigDecimal grossRevenue = BigDecimal.ZERO;
+        long totalUnitsSold = 0;
+        Set<Long> uniqueOrders = new HashSet<>();
+
+        for (OrderItem oi : items) {
+            grossRevenue = grossRevenue.add(oi.getLineTotal());
+            totalUnitsSold += oi.getQuantity();
+            if (oi.getOrder() != null) {
+                uniqueOrders.add(oi.getOrder().getOrderId());
+            }
+        }
+
+        BigDecimal commissionPaid = grossRevenue.multiply(commissionRate)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal netEarnings = grossRevenue.subtract(commissionPaid);
+
+        long activeProducts = productRepository.countByVendor_VendorIdAndStatus(vendor.getVendorId(), ProductStatus.APPROVED);
+        long pendingProducts = productRepository.countByVendor_VendorIdAndStatus(vendor.getVendorId(), ProductStatus.PENDING_APPROVAL);
+
+        return VendorAnalyticsOverviewDto.builder()
+                .vendorId(vendor.getVendorId())
+                .businessName(vendor.getBusinessName())
+                .totalSalesRevenue(grossRevenue)
+                .netEarnings(netEarnings)
+                .totalCommissionPaid(commissionPaid)
+                .totalUnitsSold(totalUnitsSold)
+                .totalOrdersCount(uniqueOrders.size())
+                .activeProductsCount(activeProducts)
+                .pendingApprovalProductsCount(pendingProducts)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendorTopProductDto> getVendorTopProducts(String email, int limit) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        List<OrderItem> items = orderItemRepository.findByVendor_VendorIdOrderByOrder_PlacedAtDesc(vendor.getVendorId());
+
+        // Group by product name / variant product
+        Map<String, VendorTopProductDto> productMap = new HashMap<>();
+        for (OrderItem oi : items) {
+            String name = oi.getProductNameSnapshot();
+            Long prodId = (oi.getVariant() != null && oi.getVariant().getProduct() != null)
+                    ? oi.getVariant().getProduct().getProductId()
+                    : null;
+
+            productMap.compute(name, (k, v) -> {
+                if (v == null) {
+                    return VendorTopProductDto.builder()
+                            .productId(prodId)
+                            .productName(name)
+                            .totalQuantitySold(oi.getQuantity())
+                            .totalRevenue(oi.getLineTotal())
+                            .build();
+                } else {
+                    v.setTotalQuantitySold(v.getTotalQuantitySold() + oi.getQuantity());
+                    v.setTotalRevenue(v.getTotalRevenue().add(oi.getLineTotal()));
+                    return v;
+                }
+            });
+        }
+
+        return productMap.values().stream()
+                .sorted(Comparator.comparing(VendorTopProductDto::getTotalRevenue).reversed())
+                .limit(Math.max(1, limit))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendorLowStockAlertDto> getVendorLowStockAlerts(String email) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        List<Inventory> lowStock = inventoryRepository.findLowStockInventoriesByVendor(vendor.getVendorId());
+
+        return lowStock.stream().map(inv -> {
+            int available = inv.getQuantityOnHand() - inv.getQuantityReserved();
+            return VendorLowStockAlertDto.builder()
+                    .productId(inv.getVariant().getProduct().getProductId())
+                    .productName(inv.getVariant().getProduct().getName())
+                    .variantId(inv.getVariant().getVariantId())
+                    .sku(inv.getVariant().getSku())
+                    .variantName(inv.getVariant().getVariantName())
+                    .availableStock(available)
+                    .reorderLevel(inv.getReorderLevel())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendorSaleItemDto> getVendorOrderItems(String email) {
+        Vendor vendor = getVendorEntityByEmail(email);
+        BigDecimal commissionRate = vendor.getCommissionRate() != null
+                ? vendor.getCommissionRate()
+                : new BigDecimal("10.00");
+
+        return orderItemRepository.findByVendor_VendorIdOrderByOrder_PlacedAtDesc(vendor.getVendorId()).stream()
+                .map(oi -> {
+                    BigDecimal itemCommission = oi.getLineTotal()
+                            .multiply(commissionRate)
+                            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+                    BigDecimal itemPayout = oi.getLineTotal().subtract(itemCommission);
+
+                    return VendorSaleItemDto.builder()
+                            .orderItemId(oi.getOrderItemId())
+                            .orderId(oi.getOrder() != null ? oi.getOrder().getOrderId() : null)
+                            .orderNumber(oi.getOrder() != null ? oi.getOrder().getOrderNumber() : "N/A")
+                            .orderStatus(oi.getOrder() != null && oi.getOrder().getStatus() != null ? oi.getOrder().getStatus().name() : "PENDING")
+                            .productName(oi.getProductNameSnapshot())
+                            .sku(oi.getSkuSnapshot())
+                            .quantity(oi.getQuantity())
+                            .unitPrice(oi.getUnitPrice())
+                            .lineTotal(oi.getLineTotal())
+                            .commissionRate(commissionRate)
+                            .commissionAmount(itemCommission)
+                            .vendorPayout(itemPayout)
+                            .placedAt(oi.getOrder() != null ? oi.getOrder().getPlacedAt() : null)
+                            .build();
+                }).collect(Collectors.toList());
     }
 
     // ─── Mapper: Vendor entity → safe VendorResponseDto ───

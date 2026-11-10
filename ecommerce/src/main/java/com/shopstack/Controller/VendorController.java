@@ -15,10 +15,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.shopstack.Enum.VendorStatus;
+import com.shopstack.DTO.VendorAnalyticsOverviewDto;
+import com.shopstack.DTO.VendorCommissionResponseDto;
+import com.shopstack.DTO.VendorCommissionUpdateDto;
+import com.shopstack.DTO.VendorLowStockAlertDto;
 import com.shopstack.DTO.VendorResponseDto;
+import com.shopstack.DTO.VendorSaleItemDto;
+import com.shopstack.DTO.VendorTopProductDto;
+import com.shopstack.Enum.VendorStatus;
 import com.shopstack.Model.VendorApproval;
 import com.shopstack.Service.VendorService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api")
@@ -30,28 +38,26 @@ public class VendorController {
         this.vendorService = vendorService;
     }
 
-    // Public endpoint: Get approved vendors (no auth needed)
+    // ─── Public Endpoints (No auth needed) ───────────────────────────────────────
+
     @GetMapping("/vendors")
     public ResponseEntity<List<VendorResponseDto>> getApprovedVendors() {
         return ResponseEntity.ok(vendorService.getAllVendors(VendorStatus.APPROVED));
     }
 
-    // Public endpoint: Get vendor by ID (no auth needed)
     @GetMapping("/vendors/{vendorId}")
     public ResponseEntity<VendorResponseDto> getVendorById(@PathVariable Long vendorId) {
         return ResponseEntity.ok(vendorService.getVendorById(vendorId));
     }
 
-    // Vendor self-service: View own store profile
-    // SecurityConfig: /api/vendor/** → ROLE_VENDOR or ROLE_ADMIN
-    // @PreAuthorize: Extra method-level guard (defence in depth)
+    // ─── Vendor Self-Service Store Profile ───────────────────────────────────────
+
     @GetMapping("/vendor/profile")
     @PreAuthorize("hasAuthority('ROLE_VENDOR')")
     public ResponseEntity<VendorResponseDto> getMyVendorProfile(Authentication authentication) {
         return ResponseEntity.ok(vendorService.getVendorByEmail(authentication.getName()));
     }
 
-    // Vendor self-service: Update own store profile
     @PutMapping("/vendor/profile")
     @PreAuthorize("hasAuthority('ROLE_VENDOR')")
     public ResponseEntity<VendorResponseDto> updateMyVendorProfile(
@@ -62,9 +68,47 @@ public class VendorController {
         return ResponseEntity.ok(vendorService.updateVendorProfile(authentication.getName(), businessName));
     }
 
-    // Admin: List all vendors with optional status filter
-    // SecurityConfig: /api/admin/** → ROLE_ADMIN only
-    // @PreAuthorize: Extra method-level guard (defence in depth)
+    // ─── Milestone 3: Vendor Commissions & Earnings ──────────────────────────────
+
+    @GetMapping("/vendor/commissions")
+    @PreAuthorize("hasAuthority('ROLE_VENDOR')")
+    public ResponseEntity<VendorCommissionResponseDto> getMyCommissions(Authentication authentication) {
+        return ResponseEntity.ok(vendorService.getVendorCommissionStatementByEmail(authentication.getName()));
+    }
+
+    // ─── Milestone 3: Vendor Dashboard & Analytics ───────────────────────────────
+
+    @GetMapping("/vendor/analytics/overview")
+    @PreAuthorize("hasAuthority('ROLE_VENDOR')")
+    public ResponseEntity<VendorAnalyticsOverviewDto> getVendorAnalyticsOverview(Authentication authentication) {
+        return ResponseEntity.ok(vendorService.getVendorAnalyticsOverview(authentication.getName()));
+    }
+
+    @GetMapping("/vendor/analytics/top-products")
+    @PreAuthorize("hasAuthority('ROLE_VENDOR')")
+    public ResponseEntity<List<VendorTopProductDto>> getVendorTopProducts(
+            Authentication authentication,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return ResponseEntity.ok(vendorService.getVendorTopProducts(authentication.getName(), limit));
+    }
+
+    @GetMapping("/vendor/analytics/low-stock")
+    @PreAuthorize("hasAuthority('ROLE_VENDOR')")
+    public ResponseEntity<List<VendorLowStockAlertDto>> getVendorLowStockAlerts(Authentication authentication) {
+        return ResponseEntity.ok(vendorService.getVendorLowStockAlerts(authentication.getName()));
+    }
+
+    // ─── Milestone 3: Vendor Order Fulfillment ──────────────────────────────────
+
+    @GetMapping("/vendor/orders")
+    @PreAuthorize("hasAuthority('ROLE_VENDOR')")
+    public ResponseEntity<List<VendorSaleItemDto>> getVendorOrderItems(Authentication authentication) {
+        return ResponseEntity.ok(vendorService.getVendorOrderItems(authentication.getName()));
+    }
+
+    // ─── Admin Vendor Management & Governance ───────────────────────────────────
+
     @GetMapping("/admin/vendors")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<VendorResponseDto>> getAllVendorsAdmin(
@@ -73,7 +117,6 @@ public class VendorController {
         return ResponseEntity.ok(vendorService.getAllVendors(status));
     }
 
-    // Admin: Approve / Reject / Suspend vendor and record in vendor_approvals
     @PatchMapping("/admin/vendors/{vendorId}/status")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<VendorResponseDto> updateVendorStatus(
@@ -87,10 +130,32 @@ public class VendorController {
         return ResponseEntity.ok(vendorService.updateVendorStatus(vendorId, status, authentication.getName(), notes));
     }
 
-    // Admin: View full approval history for a vendor
     @GetMapping("/admin/vendors/{vendorId}/approvals")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<VendorApproval>> getVendorApprovalHistory(@PathVariable Long vendorId) {
         return ResponseEntity.ok(vendorService.getVendorApprovalHistory(vendorId));
+    }
+
+    @PatchMapping("/admin/vendors/{vendorId}/commission")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<VendorResponseDto> updateVendorCommission(
+            @PathVariable Long vendorId,
+            @Valid @RequestBody VendorCommissionUpdateDto body
+    ) {
+        return ResponseEntity.ok(vendorService.updateCommissionRate(vendorId, body.getCommissionRate()));
+    }
+
+    @GetMapping("/admin/vendors/{vendorId}/commissions")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<VendorCommissionResponseDto> getVendorCommissionAdmin(
+            @PathVariable Long vendorId
+    ) {
+        return ResponseEntity.ok(vendorService.getVendorCommissionStatement(vendorId));
+    }
+
+    @GetMapping("/admin/vendors/commissions")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<List<VendorCommissionResponseDto>> getAllVendorsCommissionAdmin() {
+        return ResponseEntity.ok(vendorService.getAllVendorsCommissionSummary());
     }
 }
