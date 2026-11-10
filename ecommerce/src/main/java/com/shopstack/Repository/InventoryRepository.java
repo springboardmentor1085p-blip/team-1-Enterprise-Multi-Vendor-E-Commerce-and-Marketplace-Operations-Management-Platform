@@ -18,6 +18,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("SELECT i FROM Inventory i WHERE (i.quantityOnHand - i.quantityReserved) <= i.reorderLevel")
     List<Inventory> findLowStockInventories();
 
+    @Query("SELECT i FROM Inventory i WHERE i.variant.product.vendor.vendorId = :vendorId " +
+           "AND (i.quantityOnHand - i.quantityReserved) <= i.reorderLevel")
+    List<Inventory> findLowStockInventoriesByVendor(@Param("vendorId") Long vendorId);
+
     @Query("SELECT COALESCE(SUM(i.quantityOnHand - i.quantityReserved), 0) FROM Inventory i WHERE i.variant.variantId = :variantId")
     Integer getTotalAvailableQuantityForVariant(@Param("variantId") Long variantId);
 }

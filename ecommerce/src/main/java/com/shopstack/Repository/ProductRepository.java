@@ -16,6 +16,8 @@ import com.shopstack.Model.Product;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByVendor_VendorId(Long vendorId);
+    long countByVendor_VendorId(Long vendorId);
+    long countByVendor_VendorIdAndStatus(Long vendorId, ProductStatus status);
     List<Product> findByStatus(ProductStatus status);
     List<Product> findByCategory_CategoryId(Long categoryId);
 
