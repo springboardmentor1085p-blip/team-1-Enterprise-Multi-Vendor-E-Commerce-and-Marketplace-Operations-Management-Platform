@@ -405,10 +405,21 @@ public class ProductService {
                 .description(p.getDescription())
                 .status(p.getStatus() != null ? p.getStatus().name() : null)
                 .adminNotes(p.getAdminNotes())
+                .averageRating(p.getAverageRating() != null ? p.getAverageRating() : BigDecimal.ZERO)
+                .reviewCount(p.getReviewCount() != null ? p.getReviewCount() : 0)
                 .variants(variantDtos)
                 .imageUrls(imageUrls)
                 .createdAt(p.getCreatedAt())
                 .build();
+    }
+
+    @Transactional
+    public ProductResponseDto updateProductRating(Long productId, BigDecimal newRating, int reviewCount) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+        product.setAverageRating(newRating);
+        product.setReviewCount(reviewCount);
+        return mapToDto(productRepository.save(product));
     }
 }
 

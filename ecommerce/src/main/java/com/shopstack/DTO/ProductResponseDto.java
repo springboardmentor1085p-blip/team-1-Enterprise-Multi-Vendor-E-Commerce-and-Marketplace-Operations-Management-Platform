@@ -26,6 +26,8 @@ public class ProductResponseDto {
     private String description;
     private String status;
     private String adminNotes;
+    private BigDecimal averageRating;
+    private Integer reviewCount;
     private List<VariantResponseDto> variants;
     private List<String> imageUrls;
     private OffsetDateTime createdAt;

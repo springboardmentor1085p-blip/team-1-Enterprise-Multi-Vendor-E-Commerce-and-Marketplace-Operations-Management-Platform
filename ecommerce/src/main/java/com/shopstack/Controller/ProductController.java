@@ -179,6 +179,9 @@ public class ProductController {
             case "price":
                 mappedProperty = "variants.price";
                 break;
+            case "rating":
+                mappedProperty = "averageRating";
+                break;
             case "name":
                 mappedProperty = "name";
                 break;
