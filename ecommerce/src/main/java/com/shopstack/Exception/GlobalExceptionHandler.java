@@ -76,7 +76,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
             AccessDeniedException ex, WebRequest request) {
-        return buildError(HttpStatus.FORBIDDEN, "You do not have permission to perform this action", request);
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "You do not have permission to perform this action";
+        return buildError(HttpStatus.FORBIDDEN, message, request);
     }
 
     // ─── 500 Internal Server Error ───────────────────────────────────────────────
